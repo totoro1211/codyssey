@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>대학생 과제 마감 체크리스트</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #222;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 24px;
+      background: #ffffff;
+      border: 1px solid #ddd;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      color: #1f2937;
+    }
+
+    .remaining-count {
+      margin: 0 0 24px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #2563eb;
+    }
+
+    .form-area {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr 1fr auto;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    input,
+    button {
+      font-size: 16px;
+      padding: 10px;
+      border: 1px solid #bbb;
+    }
+
+    input:focus {
+      outline: 2px solid #93c5fd;
+      border-color: #2563eb;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .message {
+      min-height: 22px;
+      margin-bottom: 18px;
+      color: #dc2626;
+      font-weight: bold;
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .empty {
+      padding: 18px;
+      text-align: center;
+      color: #666;
+      border: 1px dashed #bbb;
+      background: #fafafa;
+    }
+
+    .task-row {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr 1fr auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid #ddd;
+      background: #ffffff;
+    }
+
+    .task-row.completed {
+      background: #f3f4f6;
+      color: #666;
+    }
+
+    .task-row.completed .task-name,
+    .task-row.completed .subject,
+    .task-row.completed .date {
+      text-decoration: line-through;
+    }
+
+    .label {
+      display: none;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .status {
+      min-width: 42px;
+      font-weight: bold;
+      color: #16a34a;
+    }
+
+    .checkbox-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .checkbox-wrap input {
+      width: 18px;
+      height: 18px;
+      padding: 0;
+    }
+
+    @media (max-width: 700px) {
+      .container {
+        margin: 20px;
+        padding: 18px;
+      }
+
+      .form-area {
+        grid-template-columns: 1fr;
+      }
+
+      .task-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .label {
+        display: block;
+      }
+
+      .status {
+        min-width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>대학생 과제 마감 체크리스트</h1>
+    <p id="remainingCount" class="remaining-count">남은 과제 0개</p>
+
+    <form id="taskForm" class="form-area">
+      <input id="subjectInput" type="text" placeholder="과목명" aria-label="과목명" />
+      <input id="taskInput" type="text" placeholder="과제 이름" aria-label="과제 이름" />
+      <input id="dateInput" type="date" aria-label="마감일" />
+      <button type="submit">추가</button>
+    </form>
+
+    <div id="message" class="message" aria-live="polite"></div>
+
+    <section id="taskList" class="list" aria-label="과제 목록">
+      <div class="empty">아직 추가된 과제가 없습니다.</div>
+    </section>
+  </main>
+
+  <script>
+    const taskForm = document.getElementById("taskForm");
+    const subjectInput = document.getElementById("subjectInput");
+    const taskInput = document.getElementById("taskInput");
+    const dateInput = document.getElementById("dateInput");
+    const message = document.getElementById("message");
+    const taskList = document.getElementById("taskList");
+    const remainingCount = document.getElementById("remainingCount");
+
+    let tasks = [];
+    let orderNumber = 0;
+
+    taskForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const subject = subjectInput.value.trim();
+      const taskName = taskInput.value.trim();
+      const dueDate = dateInput.value;
+
+      if (!subject || !taskName || !dueDate) {
+        message.textContent = "과목명, 과제 이름, 마감일을 모두 입력해 주세요.";
+        return;
+      }
+
+      tasks.push({
+        id: Date.now() + orderNumber,
+        subject: subject,
+        taskName: taskName,
+        dueDate: dueDate,
+        completed: false,
+        order: orderNumber
+      });
+
+      orderNumber++;
+
+      subjectInput.value = "";
+      taskInput.value = "";
+      dateInput.value = "";
+      message.textContent = "";
+
+      renderTasks();
+    });
+
+    function renderTasks() {
+      tasks.sort(function (a, b) {
+        if (a.dueDate < b.dueDate) return -1;
+        if (a.dueDate > b.dueDate) return 1;
+        return a.order - b.order;
+      });
+
+      taskList.innerHTML = "";
+
+      if (tasks.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "아직 추가된 과제가 없습니다.";
+        taskList.appendChild(empty);
+      } else {
+        tasks.forEach(function (task) {
+          const row = document.createElement("div");
+          row.className = "task-row";
+          if (task.completed) {
+            row.classList.add("completed");
+          }
+
+          const subjectBox = document.createElement("div");
+          subjectBox.innerHTML = '<span class="label">과목명</span>';
+          const subjectText = document.createElement("strong");
+          subjectText.className = "subject";
+          subjectText.textContent = task.subject;
+          subjectBox.appendChild(subjectText);
+
+          const taskBox = document.createElement("div");
+          taskBox.innerHTML = '<span class="label">과제 이름</span>';
+          const taskText = document.createElement("span");
+          taskText.className = "task-name";
+          taskText.textContent = task.taskName;
+          taskBox.appendChild(taskText);
+
+          const dateBox = document.createElement("div");
+          dateBox.innerHTML = '<span class="label">마감일</span>';
+          const dateText = document.createElement("span");
+          dateText.className = "date";
+          dateText.textContent = formatDate(task.dueDate);
+          dateBox.appendChild(dateText);
+
+          const checkWrap = document.createElement("label");
+          checkWrap.className = "checkbox-wrap";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = task.completed;
+          checkbox.addEventListener("change", function () {
+            task.completed = checkbox.checked;
+            renderTasks();
+          });
+
+          const checkText = document.createElement("span");
+          checkText.textContent = "완료 체크";
+
+          checkWrap.appendChild(checkbox);
+          checkWrap.appendChild(checkText);
+
+          const status = document.createElement("span");
+          status.className = "status";
+          status.textContent = task.completed ? "완료" : "";
+
+          row.appendChild(subjectBox);
+          row.appendChild(taskBox);
+          row.appendChild(dateBox);
+          row.appendChild(checkWrap);
+          row.appendChild(status);
+
+          taskList.appendChild(row);
+        });
+      }
+
+      updateRemainingCount();
+    }
+
+    function updateRemainingCount() {
+      const remaining = tasks.filter(function (task) {
+        return !task.completed;
+      }).length;
+
+      remainingCount.textContent = "남은 과제 " + remaining + "개";
+    }
+
+    function formatDate(dateValue) {
+      const parts = dateValue.split("-");
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+
+      return year + "년 " + month + "월 " + day + "일";
+    }
+
+    renderTasks();
+  </script>
+</body>
+</html>
