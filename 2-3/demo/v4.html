@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대학생 과제 마감 체크리스트</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "맑은 고딕", "Malgun Gothic", sans-serif;
+    background: #f4f6f8;
+    color: #222;
+    margin: 0;
+    padding: 20px;
+  }
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    padding: 24px;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 8px;
+  }
+  .remaining {
+    font-size: 16px;
+    font-weight: bold;
+    color: #2563eb;
+    margin-bottom: 20px;
+  }
+  .form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .form input {
+    flex: 1 1 140px;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .form button {
+    padding: 8px 18px;
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .form button:hover { background: #1d4ed8; }
+  .notice {
+    color: #dc2626;
+    font-size: 13px;
+    min-height: 18px;
+    margin-bottom: 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+  }
+  th { color: #555; font-size: 13px; background: #f9fafb; }
+  td.center, th.center { text-align: center; width: 90px; }
+  .done .subject,
+  .done .title,
+  .done .due {
+    text-decoration: line-through;
+    color: #999;
+  }
+  .status {
+    font-size: 13px;
+    color: #16a34a;
+    font-weight: bold;
+  }
+  .empty {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+    font-size: 14px;
+  }
+  .mobile-label { display: none; }
+
+  @media (max-width: 520px) {
+    body { padding: 12px; }
+    .container { padding: 16px; }
+    .form input { min-width: 0; }
+    table { position: relative; display: block; }
+    thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    tbody { display: grid; gap: 10px; }
+    tbody tr {
+      display: grid;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    tbody td, tbody td.center {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      width: auto;
+      min-width: 0;
+      padding: 5px 0;
+      border: 0;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+    tbody td.center { align-items: center; }
+    tbody .empty { display: block; text-align: center; }
+    .mobile-label {
+      display: inline;
+      flex: 0 0 64px;
+      color: #555;
+      font-weight: bold;
+      font-size: 13px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>대학생 과제 마감 체크리스트</h1>
+    <div class="remaining">남은 과제 <span id="remaining-count">0</span>개</div>
+
+    <form class="form" id="task-form">
+      <input type="text" id="subject-input" placeholder="과목명">
+      <input type="text" id="title-input" placeholder="과제 이름">
+      <input type="date" id="due-input">
+      <button id="add-btn" type="submit">추가</button>
+    </form>
+    <div class="notice" id="notice" role="alert"></div>
+
+    <table role="table" aria-label="과제 목록">
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader">과목명</th>
+          <th role="columnheader">과제 이름</th>
+          <th role="columnheader">마감일</th>
+          <th role="columnheader" class="center">완료</th>
+          <th role="columnheader" class="center">상태</th>
+        </tr>
+      </thead>
+      <tbody id="task-body" role="rowgroup"></tbody>
+    </table>
+  </div>
+
+<script>
+  // 과제 목록을 담는 배열. seq는 추가 순서(동일 마감일 정렬 기준)
+  var tasks = [];
+  var seqCounter = 0;
+
+  var subjectInput = document.getElementById('subject-input');
+  var titleInput = document.getElementById('title-input');
+  var dueInput = document.getElementById('due-input');
+  var notice = document.getElementById('notice');
+  var taskBody = document.getElementById('task-body');
+  var remainingCount = document.getElementById('remaining-count');
+
+  document.getElementById('task-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    addTask();
+  });
+
+  function addTask() {
+    var subject = subjectInput.value.trim();
+    var title = titleInput.value.trim();
+    var due = dueInput.value; // YYYY-MM-DD 형식(비어 있으면 "")
+
+    var missingFields = [
+      { input: subjectInput, value: subject, name: '과목명' },
+      { input: titleInput, value: title, name: '과제 이름' },
+      { input: dueInput, value: due, name: '마감일' }
+    ].filter(function (field) { return field.value === ''; });
+
+    if (missingFields.length > 0) {
+      var names = missingFields.map(function (field) { return field.name; });
+      var fieldsToFill = names.length === 1
+        ? names[0] + '을'
+        : names.slice(0, -1).join(', ') + ' 및 ' + names[names.length - 1] + '을';
+      notice.textContent = fieldsToFill + ' 입력해 주세요.';
+      missingFields[0].input.focus();
+      return;
+    }
+
+    notice.textContent = '';
+    tasks.push({
+      subject: subject,
+      title: title,
+      due: due,
+      done: false,
+      seq: seqCounter++
+    });
+
+    // 입력 칸 초기화
+    subjectInput.value = '';
+    titleInput.value = '';
+    dueInput.value = '';
+
+    render();
+  }
+
+  function toggleDone(seq) {
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].seq === seq) {
+        tasks[i].done = !tasks[i].done;
+        break;
+      }
+    }
+    render();
+  }
+
+  function formatDue(due) {
+    // YYYY-MM-DD -> YYYY년 M월 D일
+    var parts = due.split('-');
+    var y = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    var d = parseInt(parts[2], 10);
+    return y + '년 ' + m + '월 ' + d + '일';
+  }
+
+  function createTaskCell(className, label, content) {
+    var cell = document.createElement('td');
+    cell.className = className;
+    cell.setAttribute('role', 'cell');
+
+    var mobileLabel = document.createElement('span');
+    mobileLabel.className = 'mobile-label';
+    mobileLabel.setAttribute('aria-hidden', 'true');
+    mobileLabel.textContent = label;
+    cell.append(mobileLabel, content);
+    return cell;
+  }
+
+  function render() {
+    // 정렬: 마감일 빠른 순, 같으면 먼저 추가한(seq 작은) 순
+    var sorted = tasks.slice().sort(function (a, b) {
+      if (a.due < b.due) return -1;
+      if (a.due > b.due) return 1;
+      return a.seq - b.seq;
+    });
+
+    taskBody.innerHTML = '';
+
+    if (sorted.length === 0) {
+      var emptyRow = document.createElement('tr');
+      emptyRow.className = 'empty-row';
+      emptyRow.setAttribute('role', 'row');
+      emptyRow.innerHTML = '<td role="cell" colspan="5" class="empty">등록된 과제가 없습니다.</td>';
+      taskBody.appendChild(emptyRow);
+    } else {
+      sorted.forEach(function (task) {
+        var tr = document.createElement('tr');
+        tr.setAttribute('role', 'row');
+        if (task.done) tr.className = 'done';
+
+        var subject = document.createElement('span');
+        subject.className = 'subject';
+        subject.textContent = task.subject;
+        var title = document.createElement('span');
+        title.className = 'title';
+        title.textContent = task.title;
+        var due = document.createElement('time');
+        due.className = 'due';
+        due.dateTime = task.due;
+        due.textContent = formatDue(task.due);
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = task.done;
+        checkbox.setAttribute('aria-label', task.title + ' 완료 표시');
+        checkbox.addEventListener('change', (function (seq) {
+          return function () { toggleDone(seq); };
+        })(task.seq));
+        var status = document.createElement('span');
+        if (task.done) status.className = 'status';
+        status.textContent = task.done ? '완료' : '-';
+
+        tr.append(
+          createTaskCell('', '과목명', subject),
+          createTaskCell('', '과제 이름', title),
+          createTaskCell('', '마감일', due),
+          createTaskCell('center', '완료', checkbox),
+          createTaskCell('center', '상태', status)
+        );
+        taskBody.appendChild(tr);
+      });
+    }
+
+    // 남은 과제 수 = 완료되지 않은 과제 개수
+    var remaining = 0;
+    for (var i = 0; i < tasks.length; i++) {
+      if (!tasks[i].done) remaining++;
+    }
+    remainingCount.textContent = remaining;
+  }
+
+  // 초기 렌더링
+  render();
+</script>
+</body>
+</html>
